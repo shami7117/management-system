@@ -22,7 +22,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (user) {
-      router.push('/dashboard');
+      router.push('/');
     }
   }, [user, router]);
 
@@ -31,7 +31,7 @@ export default function LoginPage() {
     try {
       await signInWithEmailAndPassword(auth, values.email, values.password);
       message.success('Login successful!');
-      router.push('/dashboard');
+      router.push('/');
     } catch (error: any) {
       console.error(error);
       message.error('Login failed. Please check your credentials.');

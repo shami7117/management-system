@@ -24,7 +24,7 @@ export default function RegisterPage() {
 
   useEffect(() => {
     if (user) {
-      router.push('/dashboard');
+      router.push('/');
     }
   }, [user, router]);
 
@@ -49,7 +49,7 @@ export default function RegisterPage() {
       });
 
       message.success('Account created successfully!');
-      router.push('/dashboard');
+      router.push('/');
     } catch (error: any) {
       console.error(error);
       message.error(error.message || 'Registration failed. Please try again.');
