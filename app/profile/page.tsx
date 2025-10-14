@@ -182,7 +182,7 @@ export default function ProfilePage() {
           <h2 className="text-2xl font-bold text-gray-800 mb-8">Dashboard</h2>
           <nav className="space-y-2">
             <Link
-              href="/dashboard"
+              href="/"
               className="flex items-center px-4 py-3 text-gray-600 hover:bg-indigo-50 hover:text-indigo-600 rounded-lg transition-colors"
             >
               <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -204,7 +204,7 @@ export default function ProfilePage() {
       <div className="lg:hidden bg-white shadow-sm p-4 flex items-center justify-between">
         <h1 className="text-xl font-bold text-gray-800">Profile</h1>
         <Link
-          href="/dashboard"
+          href="/"
           className="text-indigo-600 hover:text-indigo-700 font-medium"
         >
           Dashboard

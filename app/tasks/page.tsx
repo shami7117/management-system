@@ -28,12 +28,14 @@ import {
   Timestamp,
   query,
   orderBy,
+  where,
 } from 'firebase/firestore';
-import { db } from '../../lib/firebase'; // Adjust path to your Firebase config
-import { useAuth } from '../../contexts/AuthContext'; // Adjust path to your AuthContext
+import { db } from '../../lib/firebase';
+import { useAuth } from '../../contexts/AuthContext';
 import dayjs from 'dayjs';
 import DashboardLayout from '../../components/DashboardLayout';
 import ProtectedRoute from '../../components/ProtectedRoute';
+
 // TypeScript Interfaces
 interface Task {
   id: string;
@@ -43,12 +45,14 @@ interface Task {
   status: 'Pending' | 'In Progress' | 'Completed';
   dueDate: string;
   createdAt: string;
+  userId: string; // Added userId field
 }
 
 interface Client {
   id: string;
   name: string;
   email?: string;
+  userId: string; // Added userId field
 }
 
 interface TaskFormValues {
@@ -105,15 +109,20 @@ const Tasks: React.FC = () => {
     }
   }, [searchText, tasks, clients]);
 
-  // Fetch Clients from Firestore
+  // Fetch Clients from Firestore - ONLY user's clients
   const fetchClients = async () => {
+    if (!user) return;
+
     try {
       const clientsRef = collection(db, 'clients');
-      const snapshot = await getDocs(clientsRef);
+      // Query only clients belonging to the current user
+      const q = query(clientsRef, where('userId', '==', user.uid));
+      const snapshot = await getDocs(q);
       const clientsList: Client[] = snapshot.docs.map((doc) => ({
         id: doc.id,
         name: doc.data().name || 'Unknown',
         email: doc.data().email,
+        userId: doc.data().userId,
       }));
       setClients(clientsList);
     } catch (error) {
@@ -122,12 +131,19 @@ const Tasks: React.FC = () => {
     }
   };
 
-  // Fetch Tasks from Firestore
+  // Fetch Tasks from Firestore - ONLY user's tasks
   const fetchTasks = async () => {
+    if (!user) return;
+
     setLoading(true);
     try {
       const tasksRef = collection(db, 'tasks');
-      const q = query(tasksRef, orderBy('createdAt', 'desc'));
+      // Query only tasks belonging to the current user
+      const q = query(
+        tasksRef, 
+        where('userId', '==', user.uid),
+        orderBy('createdAt', 'desc')
+      );
       const snapshot = await getDocs(q);
       const tasksList: Task[] = snapshot.docs.map((doc) => ({
         id: doc.id,
@@ -136,6 +152,7 @@ const Tasks: React.FC = () => {
         clientId: doc.data().clientId,
         status: doc.data().status,
         dueDate: doc.data().dueDate,
+        userId: doc.data().userId,
         createdAt: doc.data().createdAt?.toDate().toISOString() || new Date().toISOString(),
       }));
       setTasks(tasksList);
@@ -150,13 +167,26 @@ const Tasks: React.FC = () => {
 
   // Add Task
   const handleAddTask = async (values: TaskFormValues) => {
+    if (!user) {
+      message.error('You must be logged in to perform this action');
+      return;
+    }
+
     try {
+      // Verify the selected client belongs to the current user
+      const selectedClient = clients.find(c => c.id === values.clientId);
+      if (!selectedClient || selectedClient.userId !== user.uid) {
+        message.error('Invalid client selection');
+        return;
+      }
+
       const newTask = {
         title: values.title,
         description: values.description,
         clientId: values.clientId,
         status: values.status,
         dueDate: values.dueDate.format('YYYY-MM-DD'),
+        userId: user.uid, // Associate task with current user
         createdAt: Timestamp.now(),
       };
       await addDoc(collection(db, 'tasks'), newTask);
@@ -172,7 +202,24 @@ const Tasks: React.FC = () => {
 
   // Edit Task
   const handleEditTask = async (values: TaskFormValues) => {
-    if (!editingTask) return;
+    if (!editingTask || !user) {
+      message.error('You must be logged in to perform this action');
+      return;
+    }
+
+    // Security check: Ensure the task belongs to the current user
+    if (editingTask.userId !== user.uid) {
+      message.error('You do not have permission to edit this task');
+      return;
+    }
+
+    // Verify the selected client belongs to the current user
+    const selectedClient = clients.find(c => c.id === values.clientId);
+    if (!selectedClient || selectedClient.userId !== user.uid) {
+      message.error('Invalid client selection');
+      return;
+    }
+
     try {
       const taskRef = doc(db, 'tasks', editingTask.id);
       await updateDoc(taskRef, {
@@ -195,7 +242,19 @@ const Tasks: React.FC = () => {
 
   // Delete Task
   const handleDeleteTask = async (taskId: string) => {
+    if (!user) {
+      message.error('You must be logged in to perform this action');
+      return;
+    }
+
     try {
+      // Find the task to verify ownership
+      const taskToDelete = tasks.find(t => t.id === taskId);
+      if (taskToDelete && taskToDelete.userId !== user.uid) {
+        message.error('You do not have permission to delete this task');
+        return;
+      }
+
       await deleteDoc(doc(db, 'tasks', taskId));
       message.success('Task deleted successfully');
       fetchTasks();
@@ -207,6 +266,11 @@ const Tasks: React.FC = () => {
 
   // Open Add Modal
   const openAddModal = () => {
+    // Check if user has any clients
+    if (clients.length === 0) {
+      message.warning('Please add at least one client before creating a task');
+      return;
+    }
     setEditingTask(null);
     form.resetFields();
     setModalVisible(true);
@@ -335,130 +399,136 @@ const Tasks: React.FC = () => {
 
   return (
     <ProtectedRoute>
-        <DashboardLayout> <div className="p-4 md:p-6 lg:p-8">
-      {/* Header Section */}
-      <div className="mb-6">
-        <h1 className="text-2xl md:text-3xl font-bold text-gray-800 mb-4">Task Management</h1>
-        
-        {/* Action Bar */}
-        <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-          <Input
-            placeholder="Search by task title or client name..."
-            prefix={<SearchOutlined />}
-            value={searchText}
-            onChange={(e) => setSearchText(e.target.value)}
-            className="w-full sm:w-64 md:w-80"
-            allowClear
-          />
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            onClick={openAddModal}
-            className="w-full sm:w-auto"
+      <DashboardLayout>
+        <div className="p-4 md:p-6 lg:p-8">
+          {/* Header Section */}
+          <div className="mb-6">
+            <h1 className="text-2xl md:text-3xl font-bold text-gray-800 mb-4">Task Management</h1>
+            
+            {/* Action Bar */}
+            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+              <Input
+                placeholder="Search by task title or client name..."
+                prefix={<SearchOutlined />}
+                value={searchText}
+                onChange={(e) => setSearchText(e.target.value)}
+                className="w-full sm:w-64 md:w-80"
+                allowClear
+              />
+              <Button
+                type="primary"
+                icon={<PlusOutlined />}
+                onClick={openAddModal}
+                className="w-full sm:w-auto"
+                disabled={clients.length === 0}
+              >
+                Add Task
+              </Button>
+            </div>
+            {clients.length === 0 && (
+              <div className="mt-2 text-sm text-orange-600">
+                ⚠️ You need to add at least one client before creating tasks
+              </div>
+            )}
+          </div>
+
+          {/* Tasks Table */}
+          <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+            <Table
+              columns={columns}
+              dataSource={filteredTasks}
+              loading={loading}
+              rowKey="id"
+              pagination={{
+                pageSize: 10,
+                showSizeChanger: true,
+                showTotal: (total) => `Total ${total} tasks`,
+                responsive: true,
+              }}
+              scroll={{ x: 800 }}
+            />
+          </div>
+
+          {/* Add/Edit Task Modal */}
+          <Modal
+            title={editingTask ? 'Edit Task' : 'Add New Task'}
+            open={modalVisible}
+            onOk={handleModalSubmit}
+            onCancel={() => {
+              setModalVisible(false);
+              setEditingTask(null);
+              form.resetFields();
+            }}
+            okText={editingTask ? 'Update' : 'Create'}
+            width={600}
+            destroyOnClose
           >
-            Add Task
-          </Button>
+            <Form form={form} layout="vertical" className="mt-4">
+              <Form.Item
+                label="Task Title"
+                name="title"
+                rules={[{ required: true, message: 'Please enter task title' }]}
+              >
+                <Input placeholder="Enter task title" />
+              </Form.Item>
+
+              <Form.Item
+                label="Description"
+                name="description"
+                rules={[{ required: true, message: 'Please enter description' }]}
+              >
+                <Input.TextArea
+                  rows={4}
+                  placeholder="Enter task description"
+                />
+              </Form.Item>
+
+              <Form.Item
+                label="Client"
+                name="clientId"
+                rules={[{ required: true, message: 'Please select a client' }]}
+              >
+                <Select
+                  placeholder="Select client"
+                  showSearch
+                  optionFilterProp="children"
+                  filterOption={(input, option) =>
+                    (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                  }
+                  options={clients.map((client) => ({
+                    value: client.id,
+                    label: client.name,
+                  }))}
+                />
+              </Form.Item>
+
+              <Form.Item
+                label="Status"
+                name="status"
+                rules={[{ required: true, message: 'Please select status' }]}
+              >
+                <Select placeholder="Select status">
+                  <Select.Option value="Pending">Pending</Select.Option>
+                  <Select.Option value="In Progress">In Progress</Select.Option>
+                  <Select.Option value="Completed">Completed</Select.Option>
+                </Select>
+              </Form.Item>
+
+              <Form.Item
+                label="Due Date"
+                name="dueDate"
+                rules={[{ required: true, message: 'Please select due date' }]}
+              >
+                <DatePicker
+                  className="w-full"
+                  format="YYYY-MM-DD"
+                  disabledDate={(current) => current && current < dayjs().startOf('day')}
+                />
+              </Form.Item>
+            </Form>
+          </Modal>
         </div>
-      </div>
-
-      {/* Tasks Table */}
-      <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-        <Table
-          columns={columns}
-          dataSource={filteredTasks}
-          loading={loading}
-          rowKey="id"
-          pagination={{
-            pageSize: 10,
-            showSizeChanger: true,
-            showTotal: (total) => `Total ${total} tasks`,
-            responsive: true,
-          }}
-          scroll={{ x: 800 }}
-        />
-      </div>
-
-      {/* Add/Edit Task Modal */}
-      <Modal
-        title={editingTask ? 'Edit Task' : 'Add New Task'}
-        open={modalVisible}
-        onOk={handleModalSubmit}
-        onCancel={() => {
-          setModalVisible(false);
-          setEditingTask(null);
-          form.resetFields();
-        }}
-        okText={editingTask ? 'Update' : 'Create'}
-        width={600}
-        destroyOnClose
-      >
-        <Form form={form} layout="vertical" className="mt-4">
-          <Form.Item
-            label="Task Title"
-            name="title"
-            rules={[{ required: true, message: 'Please enter task title' }]}
-          >
-            <Input placeholder="Enter task title" />
-          </Form.Item>
-
-          <Form.Item
-            label="Description"
-            name="description"
-            rules={[{ required: true, message: 'Please enter description' }]}
-          >
-            <Input.TextArea
-              rows={4}
-              placeholder="Enter task description"
-            />
-          </Form.Item>
-
-          <Form.Item
-            label="Client"
-            name="clientId"
-            rules={[{ required: true, message: 'Please select a client' }]}
-          >
-            <Select
-              placeholder="Select client"
-              showSearch
-              optionFilterProp="children"
-              filterOption={(input, option) =>
-                (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
-              }
-              options={clients.map((client) => ({
-                value: client.id,
-                label: client.name,
-              }))}
-            />
-          </Form.Item>
-
-          <Form.Item
-            label="Status"
-            name="status"
-            rules={[{ required: true, message: 'Please select status' }]}
-          >
-            <Select placeholder="Select status">
-              <Select.Option value="Pending">Pending</Select.Option>
-              <Select.Option value="In Progress">In Progress</Select.Option>
-              <Select.Option value="Completed">Completed</Select.Option>
-            </Select>
-          </Form.Item>
-
-          <Form.Item
-            label="Due Date"
-            name="dueDate"
-            rules={[{ required: true, message: 'Please select due date' }]}
-          >
-            <DatePicker
-              className="w-full"
-              format="YYYY-MM-DD"
-              disabledDate={(current) => current && current < dayjs().startOf('day')}
-            />
-          </Form.Item>
-        </Form>
-      </Modal>
-    </div>
-    </DashboardLayout>
-   
+      </DashboardLayout>
     </ProtectedRoute>
   );
 };

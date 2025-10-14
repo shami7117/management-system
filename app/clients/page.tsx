@@ -38,9 +38,10 @@ import {
   Timestamp,
   query,
   orderBy,
+  where,
 } from 'firebase/firestore';
-import { db } from '../../lib/firebase'; // Adjust path to your firebase config
-import { useAuth } from '../../contexts/AuthContext'; // Adjust path to your AuthContext
+import { db } from '../../lib/firebase';
+import { useAuth } from '../../contexts/AuthContext';
 import DashboardLayout from '../../components/DashboardLayout';
 import ProtectedRoute from '../../components/ProtectedRoute';
 const { Title } = Typography;
@@ -52,6 +53,7 @@ interface Client {
   phone: string;
   company: string;
   createdAt: string;
+  userId: string; // Added userId field
 }
 
 interface ClientFormData {
@@ -80,12 +82,19 @@ export default function Clients() {
     }
   }, [user, authLoading, router]);
 
-  // Fetch clients from Firestore
+  // Fetch clients from Firestore - ONLY for the current user
   const fetchClients = async () => {
+    if (!user) return;
+    
     try {
       setLoading(true);
       const clientsRef = collection(db, 'clients');
-      const q = query(clientsRef, orderBy('createdAt', 'desc'));
+      // Query only clients that belong to the current user
+      const q = query(
+        clientsRef, 
+        where('userId', '==', user.uid),
+        orderBy('createdAt', 'desc')
+      );
       const querySnapshot = await getDocs(q);
       
       const clientsData: Client[] = querySnapshot.docs.map((doc) => ({
@@ -94,6 +103,7 @@ export default function Clients() {
         email: doc.data().email,
         phone: doc.data().phone,
         company: doc.data().company,
+        userId: doc.data().userId,
         createdAt: doc.data().createdAt?.toDate().toLocaleDateString() || '',
       }));
 
@@ -151,8 +161,19 @@ export default function Clients() {
 
   // Add or update client
   const handleSubmit = async (values: ClientFormData) => {
+    if (!user) {
+      message.error('You must be logged in to perform this action');
+      return;
+    }
+
     try {
       if (editingClient) {
+        // Security check: Ensure the client belongs to the current user
+        if (editingClient.userId !== user.uid) {
+          message.error('You do not have permission to edit this client');
+          return;
+        }
+
         // Update existing client
         const clientRef = doc(db, 'clients', editingClient.id);
         await updateDoc(clientRef, {
@@ -163,12 +184,13 @@ export default function Clients() {
         });
         message.success('Client updated successfully');
       } else {
-        // Add new client
+        // Add new client with userId
         await addDoc(collection(db, 'clients'), {
           name: values.name,
           email: values.email,
           phone: values.phone,
           company: values.company,
+          userId: user.uid, // Associate client with current user
           createdAt: Timestamp.now(),
         });
         message.success('Client added successfully');
@@ -184,7 +206,19 @@ export default function Clients() {
 
   // Delete client
   const handleDelete = async (clientId: string) => {
+    if (!user) {
+      message.error('You must be logged in to perform this action');
+      return;
+    }
+
     try {
+      // Find the client to verify ownership
+      const clientToDelete = clients.find(c => c.id === clientId);
+      if (clientToDelete && clientToDelete.userId !== user.uid) {
+        message.error('You do not have permission to delete this client');
+        return;
+      }
+
       await deleteDoc(doc(db, 'clients', clientId));
       message.success('Client deleted successfully');
       fetchClients();
@@ -302,198 +336,196 @@ export default function Clients() {
   }
 
   return (
-        <ProtectedRoute>
-            <DashboardLayout>
-                    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-6 lg:p-8">
-
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="mb-6">
-          <Title level={2} className="!mb-2">
-            Client Management
-          </Title>
-          <p className="text-gray-600">Manage your clients and their information</p>
-        </div>
-
-        <Card
-          className="shadow-lg rounded-xl border-0"
-          bodyStyle={{ padding: '24px' }}
-        >
-          {/* Action Bar */}
-          <div className="flex flex-col md:flex-row gap-4 mb-6 items-start md:items-center justify-between">
-            <Input
-              placeholder="Search clients by name, email, company or phone..."
-              prefix={<SearchOutlined className="text-gray-400" />}
-              value={searchText}
-              onChange={(e) => setSearchText(e.target.value)}
-              className="max-w-md"
-              size="large"
-              allowClear
-            />
-            <Button
-              type="primary"
-              icon={<PlusOutlined />}
-              onClick={() => openModal()}
-              size="large"
-              className="bg-blue-500 hover:bg-blue-600 shadow-md hover:shadow-lg transition-all"
-            >
-              Add Client
-            </Button>
-          </div>
-
-          {/* Table */}
-          <Table
-            columns={columns}
-            dataSource={filteredClients}
-            loading={loading}
-            rowKey="id"
-            pagination={{
-              pageSize: 10,
-              showSizeChanger: true,
-              showTotal: (total) => `Total ${total} clients`,
-              className: 'mt-4',
-            }}
-            scroll={{ x: 800 }}
-            locale={{
-              emptyText: (
-                <Empty
-                  description={
-                    searchText
-                      ? 'No clients found matching your search'
-                      : 'No clients yet. Click "Add Client" to get started!'
-                  }
-                />
-              ),
-            }}
-            className="custom-table"
-          />
-        </Card>
-
-        {/* Add/Edit Modal */}
-        <Modal
-          title={
-            <div className="flex items-center gap-2 text-lg">
-              <UserOutlined />
-              <span>{editingClient ? 'Edit Client' : 'Add New Client'}</span>
+    <ProtectedRoute>
+      <DashboardLayout>
+        <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-6 lg:p-8">
+          <div className="max-w-7xl mx-auto">
+            {/* Header */}
+            <div className="mb-6">
+              <Title level={2} className="!mb-2">
+                Client Management
+              </Title>
+              <p className="text-gray-600">Manage your clients and their information</p>
             </div>
-          }
-          open={isModalOpen}
-          onCancel={closeModal}
-          footer={null}
-          width={600}
-          destroyOnClose
-        >
-          <Form
-            form={form}
-            layout="vertical"
-            onFinish={handleSubmit}
-            className="mt-6"
-          >
-            <Form.Item
-              name="name"
-              label="Full Name"
-              rules={[
-                { required: true, message: 'Please enter client name' },
-                { min: 2, message: 'Name must be at least 2 characters' },
-              ]}
-            >
-              <Input
-                prefix={<UserOutlined />}
-                placeholder="John Doe"
-                size="large"
-              />
-            </Form.Item>
 
-            <Form.Item
-              name="email"
-              label="Email Address"
-              rules={[
-                { required: true, message: 'Please enter email address' },
-                { type: 'email', message: 'Please enter a valid email' },
-              ]}
+            <Card
+              className="shadow-lg rounded-xl border-0"
+              bodyStyle={{ padding: '24px' }}
             >
-              <Input
-                prefix={<MailOutlined />}
-                placeholder="john@example.com"
-                size="large"
-              />
-            </Form.Item>
-
-            <Form.Item
-              name="phone"
-              label="Phone Number"
-              rules={[
-                { required: true, message: 'Please enter phone number' },
-                {
-                  pattern: /^[\d\s\-\+\(\)]+$/,
-                  message: 'Please enter a valid phone number',
-                },
-              ]}
-            >
-              <Input
-                prefix={<PhoneOutlined />}
-                placeholder="+1 234 567 8900"
-                size="large"
-              />
-            </Form.Item>
-
-            <Form.Item
-              name="company"
-              label="Company Name"
-              rules={[
-                { required: true, message: 'Please enter company name' },
-                { min: 2, message: 'Company name must be at least 2 characters' },
-              ]}
-            >
-              <Input
-                prefix={<BankOutlined />}
-                placeholder="Acme Corporation"
-                size="large"
-              />
-            </Form.Item>
-
-            <Form.Item className="mb-0 mt-6">
-              <Space className="w-full justify-end">
-                <Button onClick={closeModal} size="large">
-                  Cancel
-                </Button>
+              {/* Action Bar */}
+              <div className="flex flex-col md:flex-row gap-4 mb-6 items-start md:items-center justify-between">
+                <Input
+                  placeholder="Search clients by name, email, company or phone..."
+                  prefix={<SearchOutlined className="text-gray-400" />}
+                  value={searchText}
+                  onChange={(e) => setSearchText(e.target.value)}
+                  className="max-w-md"
+                  size="large"
+                  allowClear
+                />
                 <Button
                   type="primary"
-                  htmlType="submit"
+                  icon={<PlusOutlined />}
+                  onClick={() => openModal()}
                   size="large"
-                  className="bg-blue-500 hover:bg-blue-600"
+                  className="bg-blue-500 hover:bg-blue-600 shadow-md hover:shadow-lg transition-all"
                 >
-                  {editingClient ? 'Update Client' : 'Add Client'}
+                  Add Client
                 </Button>
-              </Space>
-            </Form.Item>
-          </Form>
-        </Modal>
-      </div>
+              </div>
 
-      <style jsx global>{`
-        .custom-table .ant-table-thead > tr > th {
-          background: #f8fafc;
-          font-weight: 600;
-          color: #1e293b;
-        }
-        
-        .custom-table .ant-table-tbody > tr:hover > td {
-          background: #f1f5f9;
-        }
+              {/* Table */}
+              <Table
+                columns={columns}
+                dataSource={filteredClients}
+                loading={loading}
+                rowKey="id"
+                pagination={{
+                  pageSize: 10,
+                  showSizeChanger: true,
+                  showTotal: (total) => `Total ${total} clients`,
+                  className: 'mt-4',
+                }}
+                scroll={{ x: 800 }}
+                locale={{
+                  emptyText: (
+                    <Empty
+                      description={
+                        searchText
+                          ? 'No clients found matching your search'
+                          : 'No clients yet. Click "Add Client" to get started!'
+                      }
+                    />
+                  ),
+                }}
+                className="custom-table"
+              />
+            </Card>
 
-        .ant-modal-header {
-          border-bottom: 1px solid #f0f0f0;
-          padding: 20px 24px;
-        }
+            {/* Add/Edit Modal */}
+            <Modal
+              title={
+                <div className="flex items-center gap-2 text-lg">
+                  <UserOutlined />
+                  <span>{editingClient ? 'Edit Client' : 'Add New Client'}</span>
+                </div>
+              }
+              open={isModalOpen}
+              onCancel={closeModal}
+              footer={null}
+              width={600}
+              destroyOnClose
+            >
+              <Form
+                form={form}
+                layout="vertical"
+                onFinish={handleSubmit}
+                className="mt-6"
+              >
+                <Form.Item
+                  name="name"
+                  label="Full Name"
+                  rules={[
+                    { required: true, message: 'Please enter client name' },
+                    { min: 2, message: 'Name must be at least 2 characters' },
+                  ]}
+                >
+                  <Input
+                    prefix={<UserOutlined />}
+                    placeholder="John Doe"
+                    size="large"
+                  />
+                </Form.Item>
 
-        .ant-modal-body {
-          padding: 24px;
-        }
-      `}</style>
+                <Form.Item
+                  name="email"
+                  label="Email Address"
+                  rules={[
+                    { required: true, message: 'Please enter email address' },
+                    { type: 'email', message: 'Please enter a valid email' },
+                  ]}
+                >
+                  <Input
+                    prefix={<MailOutlined />}
+                    placeholder="john@example.com"
+                    size="large"
+                  />
+                </Form.Item>
+
+                <Form.Item
+                  name="phone"
+                  label="Phone Number"
+                  rules={[
+                    { required: true, message: 'Please enter phone number' },
+                    {
+                      pattern: /^[\d\s\-\+\(\)]+$/,
+                      message: 'Please enter a valid phone number',
+                    },
+                  ]}
+                >
+                  <Input
+                    prefix={<PhoneOutlined />}
+                    placeholder="+1 234 567 8900"
+                    size="large"
+                  />
+                </Form.Item>
+
+                <Form.Item
+                  name="company"
+                  label="Company Name"
+                  rules={[
+                    { required: true, message: 'Please enter company name' },
+                    { min: 2, message: 'Company name must be at least 2 characters' },
+                  ]}
+                >
+                  <Input
+                    prefix={<BankOutlined />}
+                    placeholder="Acme Corporation"
+                    size="large"
+                  />
+                </Form.Item>
+
+                <Form.Item className="mb-0 mt-6">
+                  <Space className="w-full justify-end">
+                    <Button onClick={closeModal} size="large">
+                      Cancel
+                    </Button>
+                    <Button
+                      type="primary"
+                      htmlType="submit"
+                      size="large"
+                      className="bg-blue-500 hover:bg-blue-600"
+                    >
+                      {editingClient ? 'Update Client' : 'Add Client'}
+                    </Button>
+                  </Space>
+                </Form.Item>
+              </Form>
+            </Modal>
           </div>
 
+          <style jsx global>{`
+            .custom-table .ant-table-thead > tr > th {
+              background: #f8fafc;
+              font-weight: 600;
+              color: #1e293b;
+            }
+            
+            .custom-table .ant-table-tbody > tr:hover > td {
+              background: #f1f5f9;
+            }
+
+            .ant-modal-header {
+              border-bottom: 1px solid #f0f0f0;
+              padding: 20px 24px;
+            }
+
+            .ant-modal-body {
+              padding: 24px;
+            }
+          `}</style>
+        </div>
       </DashboardLayout>
-      </ProtectedRoute>
+    </ProtectedRoute>
   );
 }

@@ -13,6 +13,7 @@ import {
   MenuFoldOutlined,
   MenuUnfoldOutlined,
   TeamOutlined,
+  FileSyncOutlined,
 } from "@ant-design/icons";
 import { useRouter, usePathname } from "next/navigation";
 import { useAuth } from "../contexts/AuthContext";
@@ -39,7 +40,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     { key: "/tasks", icon: <CheckSquareOutlined />, label: "Tasks" },
     { key: "/time-tracking", icon: <ClockCircleOutlined />, label: "Time Tracking" },
     { key: "/invoices", icon: <FileTextOutlined />, label: "Invoices" },
-    { key: "/settings", icon: <SettingOutlined />, label: "Settings" },
+    { key: "/reports", icon: <FileSyncOutlined />, label: "Reports" },
   ];
 
   const handleMenuClick: MenuProps["onClick"] = ({ key }) => {
@@ -56,9 +57,19 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   };
 
   const userMenuItems: MenuProps["items"] = [
-    { key: "email", label: user?.email, disabled: true },
+    { 
+      key: "email", 
+      label: user?.email || "Guest User", 
+      disabled: true 
+    },
     { type: "divider" },
-    { key: "logout", label: "Logout", icon: <LogoutOutlined />, danger: true, onClick: handleLogout },
+    { 
+      key: "logout", 
+      label: "Logout", 
+      icon: <LogoutOutlined />, 
+      danger: true, 
+      onClick: handleLogout 
+    },
   ];
 
   return (
@@ -109,7 +120,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               <Avatar icon={<UserOutlined />} className="bg-indigo-600" />
               {!collapsed && (
                   <p className="text-sm mb-0 font-medium text-gray-800">
-                    {user?.email?.split("@")[0] || "User"}
+                    {user?.email ? user.email.split("@")[0] : "Guest"}
                   </p>
               )}
             </div>
