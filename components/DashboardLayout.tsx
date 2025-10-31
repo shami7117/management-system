@@ -40,7 +40,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     { key: "/tasks", icon: <CheckSquareOutlined />, label: "Tasks" },
     { key: "/time-tracking", icon: <ClockCircleOutlined />, label: "Time Tracking" },
     { key: "/invoices", icon: <FileTextOutlined />, label: "Invoices" },
-    { key: "/reports", icon: <FileSyncOutlined />, label: "Reports" },
+    // { key: "/reports", icon: <FileSyncOutlined />, label: "Reports" },
   ];
 
   const handleMenuClick: MenuProps["onClick"] = ({ key }) => {
@@ -99,7 +99,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         <div className="h-[80%]">
           <div className="h-16 flex items-center justify-center border-b">
             <h1 className="text-gray-800 text-xl font-bold tracking-wider">
-              {collapsed ? "WM" : "WorkManager"}
+              {collapsed ? "WH" : "WorkHub"}
             </h1>
           </div>
 

@@ -403,8 +403,11 @@ const Tasks: React.FC = () => {
         <div className="p-4 md:p-6 lg:p-8">
           {/* Header Section */}
           <div className="mb-6">
-            <h1 className="text-2xl md:text-3xl font-bold text-gray-800 mb-4">Task Management</h1>
-            
+           <h1 className="text-2xl md:text-3xl font-bold text-gray-800 mb-4">Task Management</h1>
+<p className="text-gray-600">
+  Streamline your workflow by tracking time spent on each task and boosting team productivity.
+</p>
+
             {/* Action Bar */}
             <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
               <Input

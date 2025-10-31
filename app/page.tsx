@@ -397,86 +397,7 @@ export default function DashboardPage() {
           </Row>
 
           {/* Content Grid */}
-          <Row gutter={[16, 16]}>
-            {/* Project Progress */}
-            <Col xs={24} lg={16}>
-              <Card 
-                title={<span className="text-lg font-semibold">Active Projects</span>}
-                className="shadow-lg rounded-xl border-0 h-full"
-              >
-                {activeProjects.length > 0 ? (
-                  <div className="space-y-6">
-                    {activeProjects.map((project) => (
-                      <div key={project.id}>
-                        <div className="flex justify-between items-center mb-2">
-                          <span className="font-medium text-gray-800">{project.title}</span>
-                          <span className="text-sm text-gray-600">{project.progress}%</span>
-                        </div>
-                        <Progress 
-                          percent={project.progress} 
-                          strokeColor={getProgressColor(project.progress)}
-                        />
-                        <p className="text-xs text-gray-500 mt-1">
-                          Client: {project.clientName} • Due: {formatDate(project.dueDate)}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <Empty 
-                    description="No active projects yet"
-                    image={Empty.PRESENTED_IMAGE_SIMPLE}
-                  />
-                )}
-              </Card>
-            </Col>
-
-            {/* Recent Activity */}
-            <Col xs={24} lg={8}>
-              <Card 
-                title={<span className="text-lg font-semibold">Recent Activity</span>}
-                className="shadow-lg rounded-xl border-0 h-full"
-              >
-                {recentActivities.length > 0 ? (
-                  <div className="space-y-4">
-                    {recentActivities.map((activity, index) => {
-                      const config = getActivityConfig(activity.type);
-                      return (
-                        <div 
-                          key={activity.id}
-                          className={`flex items-start gap-3 ${
-                            index < recentActivities.length - 1 ? 'pb-4 border-b border-gray-100' : ''
-                          }`}
-                        >
-                          <div className={`w-10 h-10 ${config.bgColor} rounded-full flex items-center justify-center flex-shrink-0`}>
-                            {config.icon}
-                          </div>
-                          <div className="flex-1">
-                            <p className="text-sm font-medium text-gray-900">
-                              {activity.type === 'clientAdded' && 'New client added'}
-                              {activity.type === 'taskCompleted' && 'Task completed'}
-                              {activity.type === 'timeLogged' && 'Time logged'}
-                              {activity.type === 'invoiceSent' && 'Invoice sent'}
-                            </p>
-                            <p className="text-xs text-gray-500">{activity.description}</p>
-                            <p className="text-xs text-gray-400 mt-1">
-                              {getRelativeTime(activity.timestamp)}
-                            </p>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <Empty 
-                    description="No recent activity"
-                    image={Empty.PRESENTED_IMAGE_SIMPLE}
-                  />
-                )}
-              </Card>
-            </Col>
-          </Row>
-
+        
           {/* Quick Actions */}
           <Row gutter={[16, 16]} className="mt-6">
             <Col xs={24}>
@@ -485,14 +406,14 @@ export default function DashboardPage() {
                 className="shadow-lg rounded-xl border-0"
               >
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <Link href="/clients/new">
+                  <Link href="/clients">
                     <button className="w-full p-4 bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg hover:shadow-md transition-all text-center">
                       <TeamOutlined className="text-3xl text-blue-600 mb-2" />
                       <p className="text-sm font-medium text-gray-800">Add Client</p>
                     </button>
                   </Link>
                   
-                  <Link href="/tasks/new">
+                  <Link href="/tasks">
                     <button className="w-full p-4 bg-gradient-to-br from-green-50 to-green-100 rounded-lg hover:shadow-md transition-all text-center">
                       <CheckCircleOutlined className="text-3xl text-green-600 mb-2" />
                       <p className="text-sm font-medium text-gray-800">New Task</p>
@@ -506,7 +427,7 @@ export default function DashboardPage() {
                     </button>
                   </Link>
                   
-                  <Link href="/invoices/new">
+                  <Link href="/invoices">
                     <button className="w-full p-4 bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg hover:shadow-md transition-all text-center">
                       <FileTextOutlined className="text-3xl text-orange-600 mb-2" />
                       <p className="text-sm font-medium text-gray-800">Create Invoice</p>

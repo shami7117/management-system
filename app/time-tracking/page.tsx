@@ -726,7 +726,7 @@ const TimeTracking: React.FC = () => {
       <div className="mb-6 space-y-4">
         <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
           <Space wrap>
-            <Button
+            {/* <Button
               type="primary"
               icon={<PlayCircleOutlined />}
               onClick={handleStartTimer}
@@ -734,7 +734,7 @@ const TimeTracking: React.FC = () => {
               size="large"
             >
               Start Timer
-            </Button>
+            </Button> */}
             <Button icon={<PlusOutlined />} onClick={openAddModal}>
               Add Entry
             </Button>
